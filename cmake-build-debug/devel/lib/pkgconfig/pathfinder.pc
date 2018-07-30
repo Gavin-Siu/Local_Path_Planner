@@ -1,8 +1,0 @@
-prefix=/home/chaoz/SAEAuto_ROS/src/pathfinder/cmake-build-debug/devel
-
-Name: pathfinder
-Description: Description of pathfinder
-Version: 0.0.0
-Cflags: 
-Libs: -L/home/chaoz/SAEAuto_ROS/src/pathfinder/cmake-build-debug/devel/lib 
-Requires: 

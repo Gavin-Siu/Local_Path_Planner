@@ -1,8 +1,0 @@
-prefix=/usr/local
-
-Name: pathfinder
-Description: Description of pathfinder
-Version: 0.0.0
-Cflags: 
-Libs: -L/usr/local/lib 
-Requires: 
