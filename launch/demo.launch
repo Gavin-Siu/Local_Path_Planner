@@ -1,0 +1,5 @@
+<launch>
+    <rosparam command="load" file="$(find pathfinder)/config/demo.yaml" />
+
+    <node name="demo" pkg="pathfinder" type="demo" output="screen"/>
+</launch>
