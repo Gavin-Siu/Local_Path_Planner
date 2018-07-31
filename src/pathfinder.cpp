@@ -462,6 +462,20 @@ bool pathfinder::read_parameters() {
     double_ptr = &clustering_threshold;
     status = status && n.getParam("/" + package_name + "/" + parameter_name, *double_ptr);
 
+    parameter_name = "publish_path";
+    bool_ptr = &publish_path;
+    status = status && n.getParam("/" + package_name + "/" + parameter_name, *bool_ptr);
+
+    parameter_name = "num_of_path_points";
+    int_ptr = &num_of_path_points;
+    status = status && n.getParam("/" + package_name + "/" + parameter_name, *int_ptr);
+
+    parameter_name = "time_interval";
+    double_ptr = &time_interval;
+    status = status && n.getParam("/" + package_name + "/" + parameter_name, *double_ptr);
+
+    
+
     return status;
 }
 
@@ -729,7 +743,8 @@ void pathfinder::stop() {
     // stop
     geometry_msgs::Twist cmdvel;
     cmdvel.linear.x = 0.0;
-    cmdvel.angular.z = 0.0;
+    cmdvel.angular.z = tar_steering_angle;
+    tar_linear_velocity = cmdvel.linear.x;
     cmdvel_pub.publish(cmdvel);
 }
 
@@ -744,6 +759,9 @@ void pathfinder::curve(double angle, int sign) {
     geometry_msgs::Twist cmdvel;
     cmdvel.linear.x = 5.0;
     cmdvel.angular.z = (double) sign * angle / 180.0 * M_PI;
+    tar_linear_velocity = cmdvel.linear.x;
+    tar_steering_angle = cmdvel.angular.z;
+    tar_rotate_velocity = tar_linear_velocity * sin(cmdvel.angular.z) / DIST_FRONT_TO_REAR;
     cmdvel_pub.publish(cmdvel);
 }
 
@@ -781,4 +799,32 @@ bool pathfinder::find_cones() {
     }
 
     return !cones.empty();
+}
+
+bool pathfinder::visualise_path(double time_interval, int num_of_points) {
+    visualization_msgs::MarkerArray path_points;
+    for(int i = 0; i < num_of_points; i++) {
+        double time_spent = time_interval * (i + 1.0);
+        visualization_msgs::Marker path_point;
+        path_point.header.frame_id = "base_link";
+        path_point.action = visualization_msgs::Marker::ADD;
+        path_point.type = visualization_msgs::Marker::ARROW;
+        path_point.color.a = 1.0;
+        path_point.color.r = 1.0;
+        path_point.color.g = 1.0;
+        path_point.color.b = 0.0;
+        path_point.scale.x = 0.5;
+        path_point.scale.y = 0.1;
+        path_point.scale.z = 0.1;
+        double yaw_change = time_spent * tar_rotate_velocity;
+        double turning_radius = DIST_LIDAR_TO_CAR / sin(tar_steering_angle);
+        tf::Quaternion q = tf::createQuaternionFromYaw(yaw_change);
+        tf::quaternionTFToMsg(q, path_point.pose.orientation);
+        path_point.pose.position.z = 0.0;
+        path_point.pose.position.x = sin(yaw_change) * turning_radius;
+        path_point.pose.position.y = cos(yaw_change) * turning_radius;
+        path_point.id = i;
+        path_points.markers.push_back(path_point);
+    }
+    path_pub.publish(path_points);
 }

@@ -15,6 +15,7 @@
 #include <exception>
 
 #define DIST_LIDAR_TO_CAR 1.8
+#define DIST_FRONT_TO_REAR 1.8
 
 struct point_2d {
     double x;
@@ -119,6 +120,8 @@ private:
 
     double check_inner_track(int sign);
 
+    bool visualise_path(double time_interval, int num_of_points);
+
     ros::NodeHandle n;
     int spin_rate;
     ros::Rate rate;
@@ -131,6 +134,7 @@ private:
 
     double tar_linear_velocity;
     double tar_rotate_velocity;
+    double tar_steering_angle;
 
     std::vector<point_2d> cones;
     std::vector<point_2d> left_cones;
@@ -142,6 +146,10 @@ private:
     bool use_laserscan;
     range_1d laserscan;
     double clustering_threshold;
+
+    bool publish_path;
+    int num_of_path_points;
+    double time_interval;
 
     ros::Subscriber odom_sub;
     std::string odom_topic_name;
