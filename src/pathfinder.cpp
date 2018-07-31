@@ -7,10 +7,7 @@
 #include <algorithm>
 
 
-std::vector<double> r_meter = {4.25916285, 5.26284792, 6.954665949, 10.36578687, 20.65268384, 41.26605413,
-                                     51.57667503,
-                                     103.1376393};
-std::vector<double> angle_degree = {25.0, 20.0, 15.0, 10.0, 5.0, 2.5, 2.0, 1.0};
+
 
 /**
  * point_2d::point_2d - constructor
@@ -106,15 +103,20 @@ range_1d::range_1d(sensor_msgs::LaserScanConstPtr ls_ptr) {
  */
 range_1d::range_1d(sensor_msgs::LaserScanConstPtr ls_ptr, double desired_angle_max, double desired_angle_min) {
     max_range = ls_ptr->range_max;
-    resolution = ls_ptr->angle_increment;
+    resolution = ls_ptr->angle_increment * M_1_PI * 180.0;
+    
     if (resolution > 0) {
         max_angle = ls_ptr->angle_max * M_1_PI * 180.0;
         min_angle = ls_ptr->angle_min * M_1_PI * 180.0;
-        assert(max_angle < desired_angle_max);
-        assert(min_angle > desired_angle_min);
+        assert(max_angle > desired_angle_max);
+        assert(min_angle < desired_angle_min);
+        //std::cout<<max_angle<<" | "<<desired_angle_max<<std::endl;
+        //std::cout<<min_angle<<" | "<<desired_angle_min<<std::endl;
         int begin_index = (int) ((desired_angle_min - min_angle) / resolution);
         int end_index = (int) ((desired_angle_max - min_angle) / resolution) + 1;
-        ranges.reserve((size_t) end_index - begin_index);
+        size_t num_points = end_index - begin_index;
+        ranges.reserve(num_points);
+        //std::cout<<begin_index<<" | "<< num_points<<" | "<<end_index<<std::endl;
         for (int i = begin_index; i != end_index; i++) {
             ranges.push_back(ls_ptr->ranges[i]);
         }
@@ -124,13 +126,19 @@ range_1d::range_1d(sensor_msgs::LaserScanConstPtr ls_ptr, double desired_angle_m
         resolution = -resolution;
         max_angle = ls_ptr->angle_min * M_1_PI * 180.0;
         min_angle = ls_ptr->angle_max * M_1_PI * 180.0;
-        assert(max_angle < desired_angle_max);
-        assert(min_angle > desired_angle_min);
+        assert(max_angle > desired_angle_max);
+        assert(min_angle < desired_angle_min);
+        //std::cout<<max_angle<<" | "<<desired_angle_max<<std::endl;
+        //std::cout<<min_angle<<" | "<<desired_angle_min<<std::endl;
         int rbegin_index = (int) ((max_angle - desired_angle_min) / resolution);
         int rend_index = (int) ((max_angle - desired_angle_max) / resolution) - 1;
-        ranges.reserve((size_t) rbegin_index - rend_index);
+       
+        size_t num_points = rbegin_index - rend_index;
+        ranges.reserve(num_points);
+        //std::cout<<rbegin_index<<" | "<< num_points<<" | "<<rend_index<<std::endl;
         for (int i = rbegin_index; i > rend_index; i--) {
             ranges.push_back(ls_ptr->ranges[i]);
+        //    std::cout<<i<<std::endl;
         }
         max_angle = desired_angle_max;
         min_angle = desired_angle_min;
@@ -236,6 +244,11 @@ pathfinder::pathfinder(ros::NodeHandle n) : n(n), rate(15) {
     has_new_cone = false;
     has_new_laserscan = false;
     use_laserscan = false;
+    r_meter = {4.25916285, 5.26284792, 6.954665949, 10.36578687, 20.65268384, 41.26605413,
+                                     51.57667503,
+                                     103.1376393};
+	angle_degree = {25.0, 20.0, 15.0, 10.0, 5.0, 2.5, 2.0, 1.0};
+	std::cout<<r_meter.size()<<" | "<<angle_degree.size()<<std::endl;
 }
 
 /**
@@ -276,7 +289,7 @@ bool pathfinder::PrintConfig() {
  * @return true if success; false otherwise.
  */
 bool pathfinder::PrintStatus() {
-    std::string s_tab = "    ";
+    static std::string s_tab = "    ";
     ROS_INFO_STREAM("\npose:\n" << s_tab << "x:\n" << s_tab + s_tab << cur_x <<
                                 s_tab << "y:\n" << s_tab + s_tab << cur_y <<
                                 s_tab << "yaw:\n" << s_tab + s_tab << orientation <<
@@ -305,8 +318,8 @@ bool pathfinder::Start() {
 
         // print status every 1 s
         if (++count == spin_rate) {
-            status &= PrintStatus();
-            count = 0;
+            //status &= PrintStatus();
+            //count = 0;
         }
 
         // if laserscan is used, find cones
@@ -315,6 +328,7 @@ bool pathfinder::Start() {
                 has_new_laserscan = false;
                 if (find_cones()) {
                     has_new_cone = true;
+                    std::cout<<"found cones"<<std::endl;
                 }
             }
         }
@@ -322,18 +336,21 @@ bool pathfinder::Start() {
 //        sort cones into left and right side
         if (has_new_cone) {
             has_new_cone = false;
-
-            status &= (sort_cones(sort_type::left) | sort_cones(sort_type::right));
-
+			ROS_INFO("has new cone");
+			
+            sort_cones(sort_type::left) | sort_cones(sort_type::right);
+			
 //            valid cones found
             if (status) {
 //                start driving
-                status &= drive();
+				std::cout<<"start driving"<<std::endl;
+                drive();
             }
         }
 
-
+		PrintStatus();
         rate.sleep();
+        std::cout<<"sleep done"<<std::endl;
     }
 
     return status;
@@ -364,24 +381,33 @@ bool pathfinder::sort_cones(sort_type st) {
     switch (st) {
         case sort_type::left:
             cone_vec_ptr = &left_cones;
-            compare_orientation = orientation;
+            cone_vec_ptr->clear();
+			for (auto iter = cones.begin(); iter != cones.end(); iter++) {
+				if ((*iter).orientation > 0) {
+					cone_vec_ptr->push_back(*iter);
+					cones.erase(iter);
+					break;
+				}
+			}
+            ROS_INFO("sorting left");
             break;
 
         case sort_type::right:
+			ROS_INFO("sorting right");
             cone_vec_ptr = &right_cones;
-            compare_orientation = -orientation;
+            cone_vec_ptr->clear();
+            for (auto iter = cones.begin(); iter != cones.end(); iter++) {
+				if ((*iter).orientation < 0) {
+					cone_vec_ptr->push_back(*iter);
+					cones.erase(iter);
+					break;
+				}
+			}
+            compare_orientation = 1;
             break;
     }
 
-    // get closest cone in left or right side as first element
-    cone_vec_ptr->clear();
-    for (auto iter = cones.begin(); iter != cones.end(); iter++) {
-        if ((*iter).orientation > compare_orientation) {
-            cone_vec_ptr->push_back(*iter);
-            cones.erase(iter);
-            break;
-        }
-    }
+    
 
     // take the closest cone to the previous cone as next element
     // until exceed threshold distance
@@ -396,13 +422,18 @@ bool pathfinder::sort_cones(sort_type st) {
                 min_iter = iter;
             }
         }
+        ROS_INFO_STREAM("min_dist:"<<min_dist);
         if (min_dist < cones_max_distance) {
             cone_vec_ptr->back().orientation = cone_vec_ptr->back() / (*min_iter);
             cone_vec_ptr->push_back(*min_iter);
             cones.erase(min_iter);
-        }
-    } while (min_dist >= cones_max_distance);
+            ROS_INFO_STREAM("cone size:"<<cones.size());
+        } else {
+			break;
+		}
+	} while (min_dist < cones_max_distance);
 
+	ROS_INFO("sort done");
     // check number of valid cones
     if (cone_vec_ptr->size() < 2) {
         return false;
@@ -566,10 +597,11 @@ void pathfinder::cones_cb(visualization_msgs::MarkerArrayConstPtr msg) {
     auto iter = msg->markers.begin();
     for (; iter != msg->markers.end(); iter++) {
 //        TODO: find proper size of objects
-        assert((*iter).header.frame_id == "base_link");
+        //assert((*iter).header.frame_id == "base_link");
         cones.emplace_back((*iter).pose.position.x, (*iter).pose.position.y, 0.5);
     }
     std::sort(cones.begin(), cones.end());
+    ROS_INFO_STREAM("cones_size:"<<cones.size());
 }
 
 /**
@@ -589,6 +621,7 @@ void pathfinder::laser_cb(sensor_msgs::LaserScanConstPtr msg) {
         std::cerr << e.what();
         exit(-1);
     }
+    std::cout<<"get new laserscan"<<std::endl;
 }
 
 /**
@@ -599,20 +632,20 @@ void pathfinder::laser_cb(sensor_msgs::LaserScanConstPtr msg) {
 bool pathfinder::drive() {
     double mean_ori_left = 0;
     double mean_ori_right = 0;
-    int sign = 0;
+    int sign = 1;
 
     // get mean orientation of left track
     for (auto iter = left_cones.begin(); iter != left_cones.end() - 1; iter++) {
         mean_ori_left += (*iter).orientation;
     }
     mean_ori_left /= (left_cones.size() - 1);
-
+	std::cout<<"left"<<std::endl;
     // get mean orientation of right track
     for (auto iter = right_cones.begin(); iter != right_cones.end() - 1; iter++) {
         mean_ori_right += (*iter).orientation;
     }
     mean_ori_right /= (right_cones.size() - 1);
-
+	std::cout<<"right"<<std::endl;
     // get sign based on mean orientation
     if ((mean_ori_right + mean_ori_left) / 2.0 > 0) {
         sign = -1;    // curving to right
@@ -620,13 +653,13 @@ bool pathfinder::drive() {
     } else {
         sign = 1;     // curving to left
     }
-
+	std::cout<<"sign:"<<sign<<std::endl;
     // get minimum allowable steering angle
     double min_angle = check_outer_track(sign);
-
+	std::cout<<"outer"<<std::endl;
     // get maximum allowable steering angle
     double max_angle = check_inner_track(sign);
-
+	std::cout<<"inner"<<std::endl;
     // invalid steering angle
     if (min_angle > max_angle) {
         stop();
@@ -710,12 +743,14 @@ double pathfinder::check_inner_track(int sign) {
         default:
             exit(-1);
     }
+    std::cout<<"switch in inner"<<std::endl;
 
     // get maximum allowable steering angle following inner track
     double max_angle = 0.0;
     {
         std::vector<double>::reverse_iterator r_iter, a_iter;
-        for (r_iter = r_meter.rbegin(), a_iter = angle_degree.rbegin(); r_iter != r_meter.rend(); r_iter--, a_iter--) {
+        for (r_iter = r_meter.rbegin(), a_iter = angle_degree.rbegin(); r_iter != r_meter.rend(); r_iter++, a_iter++) {
+			//std::cout<<"reverse iterator"<<std::endl;
             bool got_desired = false;
             center_point.x = 0;
             center_point.y = (double) sign * (*r_iter);
@@ -806,7 +841,7 @@ bool pathfinder::visualise_path(double time_interval, int num_of_points) {
     for(int i = 0; i < num_of_points; i++) {
         double time_spent = time_interval * (i + 1.0);
         visualization_msgs::Marker path_point;
-        path_point.header.frame_id = "base_link";
+        path_point.header.frame_id = "laser";
         path_point.action = visualization_msgs::Marker::ADD;
         path_point.type = visualization_msgs::Marker::ARROW;
         path_point.color.a = 1.0;

@@ -147,6 +147,8 @@ private:
     range_1d laserscan;
     double clustering_threshold;
 
+	std::vector<double> r_meter;
+	std::vector<double> angle_degree;
     bool publish_path;
     int num_of_path_points;
     double time_interval;

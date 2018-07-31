@@ -1,13 +1,13 @@
 /pathfinder:
-  spin_rate: 15
+  spin_rate: 10
   cones_max_distance: 1.5
   odom_topic: "/pose"
   cones_topic: "/cones"
-  use_laserscan: true
-  laser_topic: "/laser"
+  use_laserscan: false
+  laser_topic: "/scan"
   cmdvel_topic: "/rossae/cmdvel"
   path_topic: "/pathfinder/path"
-  clustering_threshold: 0.5
+  clustering_threshold: 1.0
   publish_path: true
   num_of_path_points: 5
   time_interval: 0.2
