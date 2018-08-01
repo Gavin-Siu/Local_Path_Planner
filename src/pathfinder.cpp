@@ -450,10 +450,10 @@ bool pathfinder::sort_cones(sort_type st) {
 bool pathfinder::read_parameters() {
     std::string package_name = "pathfinder";
     std::string parameter_name;
-    std::string *str_ptr = NULL;
-    int *int_ptr = NULL;
-    double *double_ptr = NULL;
-    bool *bool_ptr = NULL;
+    std::string *str_ptr = nullptr;
+    int *int_ptr = nullptr;
+    double *double_ptr = nullptr;
+    bool *bool_ptr = nullptr;
 
     bool status = true;
 
@@ -505,7 +505,13 @@ bool pathfinder::read_parameters() {
     double_ptr = &time_interval;
     status = status && n.getParam("/" + package_name + "/" + parameter_name, *double_ptr);
 
-    
+    parameter_name = "publish_cones";
+    bool_ptr = &publish_cones;
+    status = status && n.getParam("/" + package_name + "/" + parameter_name, *bool_ptr);
+
+    parameter_name = "frame_id";
+    str_ptr = &frame_id;
+    status = status && n.getParam("/" + package_name + "/" + parameter_name, *str_ptr);
 
     return status;
 }
@@ -554,9 +560,16 @@ bool pathfinder::setup_publishers() {
     cmdvel_pub = n.advertise<geometry_msgs::Twist>(cmdvel_topic_name, 1);
 
     // path_pub
-    status = status && !path_topic_name.empty();
-    if (status) {
+    if(publish_path) {
+        status = status && !path_topic_name.empty();
+        assert(!path_topic_name.empty());
         path_pub = n.advertise<visualization_msgs::MarkerArray>(path_topic_name, 1);
+    }
+
+    if(publish_cones) {
+        status = status && !cones_topic_name.empty();
+        assert(!cones_topic_name.empty());
+        cones_pub = n.advertise<visualization_msgs::MarkerArray>(cones_topic_name, 1);
     }
 
     return status;
@@ -837,29 +850,80 @@ bool pathfinder::find_cones() {
 }
 
 bool pathfinder::visualise_path(double time_interval, int num_of_points) {
-    visualization_msgs::MarkerArray path_points;
+    static std::string ns = "/pathfinder/path";
+    path_pub.publish(get_clear_markers(ns));
+    visualization_msgs::MarkerArray markers;
     for(int i = 0; i < num_of_points; i++) {
         double time_spent = time_interval * (i + 1.0);
-        visualization_msgs::Marker path_point;
-        path_point.header.frame_id = "laser";
-        path_point.action = visualization_msgs::Marker::ADD;
-        path_point.type = visualization_msgs::Marker::ARROW;
-        path_point.color.a = 1.0;
-        path_point.color.r = 1.0;
-        path_point.color.g = 1.0;
-        path_point.color.b = 0.0;
-        path_point.scale.x = 0.5;
-        path_point.scale.y = 0.1;
-        path_point.scale.z = 0.1;
+        visualization_msgs::Marker marker;
+        marker.ns = ns;
+        marker.header.frame_id = "laser";
+        marker.action = visualization_msgs::Marker::ADD;
+        marker.type = visualization_msgs::Marker::ARROW;
+        marker.color.a = 1.0;
+        marker.color.r = 1.0;
+        marker.color.g = 1.0;
+        marker.color.b = 0.0;
+        marker.scale.x = 0.5;
+        marker.scale.y = 0.1;
+        marker.scale.z = 0.1;
         double yaw_change = time_spent * tar_rotate_velocity;
         double turning_radius = DIST_LIDAR_TO_CAR / sin(tar_steering_angle);
         tf::Quaternion q = tf::createQuaternionFromYaw(yaw_change);
-        tf::quaternionTFToMsg(q, path_point.pose.orientation);
-        path_point.pose.position.z = 0.0;
-        path_point.pose.position.x = sin(yaw_change) * turning_radius;
-        path_point.pose.position.y = cos(yaw_change) * turning_radius;
-        path_point.id = i;
-        path_points.markers.push_back(path_point);
+        tf::quaternionTFToMsg(q, marker.pose.orientation);
+        marker.pose.position.z = 0.0;
+        marker.pose.position.x = sin(yaw_change) * turning_radius;
+        marker.pose.position.y = cos(yaw_change) * turning_radius;
+        marker.id = i;
+        markers.markers.push_back(marker);
     }
-    path_pub.publish(path_points);
+    path_pub.publish(markers);
+}
+
+bool pathfinder::visualise_cones(std::vector<point_2d> tar_cones, std::string name) {
+    static std::list<std::string> ns_list;
+    if(tar_cones.empty()) {
+        return false;
+    }
+    if (name == "all") {
+
+    }
+    visualization_msgs::MarkerArray markers;
+    for(int i = 0; i < tar_cones.size(); i++) {
+        double time_spent = time_interval * (i + 1.0);
+        visualization_msgs::Marker marker;
+        marker.header.frame_id = "laser";
+        marker.action = visualization_msgs::Marker::ADD;
+        marker.type = visualization_msgs::Marker::ARROW;
+        marker.color.a = 1.0;
+        marker.color.r = 1.0;
+        marker.color.g = 1.0;
+        marker.color.b = 0.0;
+        marker.scale.x = 0.5;
+        marker.scale.y = 0.1;
+        marker.scale.z = 0.1;
+        double yaw_change = time_spent * tar_rotate_velocity;
+        double turning_radius = DIST_LIDAR_TO_CAR / sin(tar_steering_angle);
+        tf::Quaternion q = tf::createQuaternionFromYaw(yaw_change);
+        tf::quaternionTFToMsg(q, marker.pose.orientation);
+        marker.pose.position.z = 0.0;
+        marker.pose.position.x = sin(yaw_change) * turning_radius;
+        marker.pose.position.y = cos(yaw_change) * turning_radius;
+        marker.id = i;
+        markers.markers.push_back(marker);
+    }
+}
+
+visualization_msgs::MarkerArray& pathfinder::get_clear_markers(std::string name) {
+    static visualization_msgs::MarkerArray markers = _get_clear_markers(frame_id);
+    markers.markers.back().ns = name;
+    return markers;
+}
+
+visualization_msgs::MarkerArray pathfinder::_get_clear_markers(std::string frame_id) {
+    visualization_msgs::MarkerArray markers;
+    markers.markers.resize(1);
+    markers.markers[0].header.frame_id = frame_id;
+    markers.markers[0].action = visualization_msgs::Marker::DELETEALL;
+    return markers;
 }

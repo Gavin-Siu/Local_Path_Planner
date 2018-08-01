@@ -14,7 +14,7 @@
 #include <tf/tf.h>
 #include <exception>
 
-#define DIST_LIDAR_TO_CAR 1.8
+#define DIST_LIDAR_TO_CAR 1.7
 #define DIST_FRONT_TO_REAR 1.8
 
 struct point_2d {
@@ -121,12 +121,13 @@ private:
     double check_inner_track(int sign);
 
     bool visualise_path(double time_interval, int num_of_points);
-    
-    bool clear_path();
 
-	bool visualise_cones(std::vector<point_2d>, std::string name);
-	
-	bool clear_cones(std::string name = all);
+	bool visualise_cones(std::vector<point_2d> tar_cones, std::string name = "all");
+
+    visualization_msgs::MarkerArray& get_clear_markers(std::string name);
+
+	visualization_msgs::MarkerArray _get_clear_markers(std::string frame_id);
+
     ros::NodeHandle n;
     int spin_rate;
     ros::Rate rate;
@@ -160,6 +161,8 @@ private:
     bool publish_path;
     int num_of_path_points;
     double time_interval;
+
+    std::string frame_id;
 
     ros::Subscriber odom_sub;
     std::string odom_topic_name;

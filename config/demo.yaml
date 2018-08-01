@@ -12,5 +12,6 @@
   publish_path: true
   num_of_path_points: 5
   time_interval: 0.2
+  frame_id: "laser"
 
 
