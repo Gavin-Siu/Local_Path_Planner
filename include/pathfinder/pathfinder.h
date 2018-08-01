@@ -121,7 +121,12 @@ private:
     double check_inner_track(int sign);
 
     bool visualise_path(double time_interval, int num_of_points);
+    
+    bool clear_path();
 
+	bool visualise_cones(std::vector<point_2d>, std::string name);
+	
+	bool clear_cones(std::string name = all);
     ros::NodeHandle n;
     int spin_rate;
     ros::Rate rate;
@@ -149,6 +154,9 @@ private:
 
 	std::vector<double> r_meter;
 	std::vector<double> angle_degree;
+	
+	bool publish_cones;
+	
     bool publish_path;
     int num_of_path_points;
     double time_interval;
@@ -157,6 +165,7 @@ private:
     std::string odom_topic_name;
 
     ros::Subscriber cones_sub;
+    ros::Publisher cones_pub;
     std::string cones_topic_name;
 
     ros::Subscriber laser_sub;
@@ -167,6 +176,7 @@ private:
 
     ros::Publisher path_pub;
     std::string path_topic_name;
+    
 
 };
 

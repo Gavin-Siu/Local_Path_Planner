@@ -8,6 +8,7 @@
   cmdvel_topic: "/rossae/cmdvel"
   path_topic: "/pathfinder/path"
   clustering_threshold: 1.0
+  publish_cones: true
   publish_path: true
   num_of_path_points: 5
   time_interval: 0.2
