@@ -45,9 +45,7 @@ private:
 
     bool setup_publishers();
 
-    bool drive1();
-
-    bool drive2();
+	bool drive2();
 
     bool update_steering_ranges(cone_2d& cone);
 
@@ -65,21 +63,28 @@ private:
 
     bool find_cones();
 
-    bool sort_cones(SORT_TYPE st);
+	bool visualise_path(double time_interval, int num_of_points);
 
-    double check_outer_track(int sign);
+	bool visualise_cones(std::vector<cone_2d> &tar_cones,
+                         std::string name,
+                         MARKER_COLOR color);
 
-    double check_inner_track(int sign);
+	bool visualise_cones(std::list<cone_2d> &tar_cones,
+                         std::string name,
+                         MARKER_COLOR color);
 
-    bool visualise_path(double time_interval, int num_of_points);
-
-	bool visualise_cones(std::vector<cone_2d> &tar_cones, std::string name, MARKER_COLOR color);
-
-	bool visualise_cones(std::list<cone_2d> &tar_cones, std::string name, MARKER_COLOR color);
+	bool visualise_boundary();
 
     visualization_msgs::MarkerArray& get_clear_markers(std::string name);
 
 	visualization_msgs::MarkerArray _get_clear_markers(std::string frame_id);
+
+	bool get_steering_marker(std::string name,
+                             double steering,
+                             visualization_msgs::MarkerArray& markers,
+                             std_msgs::ColorRGBA color);
+
+	bool visualise_ranges();
 
     ros::NodeHandle n;
     int spin_rate;
@@ -108,6 +113,8 @@ private:
     double clearance_radius;
     double max_steering;
 
+    bool apply_median_filter;
+    int filter_size;
     bool has_new_cone;
     bool has_new_laserscan;
     bool use_laserscan;
@@ -116,9 +123,9 @@ private:
 
 	std::vector<double> r_meter;
 	std::vector<double> angle_degree;
-	
+
 	bool publish_cones;
-	
+
     bool publish_path;
     int num_of_path_points;
     double time_interval;
@@ -142,6 +149,14 @@ private:
 
     ros::Publisher path_pub;
     std::string path_topic_name;
+
+    ros::Publisher ranges_pub;
+    std::string ranges_topic_name;
+    bool publish_ranges;
+
+    ros::Publisher boundary_pub;
+    std::string boundary_topic_name;
+    bool publish_boundary;
 };
 
 #endif //PROJECT_PATHFINDER_H

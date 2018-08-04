@@ -137,12 +137,15 @@ bool pathfinder::Start() {
 //        std::cin>>key;
         switch (mode) {
             case 1:
-                drive1();
+                assert(false);
                 break;
 
             case 2:
                 drive2();
-//                visualise_cones(left_cones, "left_cones", MARKER_COLOR::RED);
+                visualise_cones(left_cones, "left_cones", MARKER_COLOR::RED);
+                if(publish_boundary) {
+                    visualise_boundary();
+                }
                 break;
 
             default:
@@ -154,11 +157,15 @@ bool pathfinder::Start() {
             visualise_path(time_interval, num_of_path_points);
         }
 
+        if (publish_ranges) {
+            visualise_ranges();
+        }
+
         cones.clear();
         valid_ranges.clear();
 
         rate.sleep();
-        std::cout << "sleep done" << std::endl;
+//        std::cout << "sleep done" << std::endl;
     }
 
     return status;
@@ -171,80 +178,6 @@ bool pathfinder::Start() {
  */
 bool pathfinder::Stop() {
     return false;
-}
-
-/**
- * pathfinder::sort_cones
- *
- * @param st - left or right
- * @return true if success; false otherwise.
- */
-bool pathfinder::sort_cones(SORT_TYPE st) {
-//    sort cones into either left or right
-//    return false if less than 2 cones are sorted as valid.
-
-    std::vector<cone_2d> *cone_vec_ptr = nullptr;
-    double compare_orientation;
-    // based on sort type select correct vector and orientation to work with
-    switch (st) {
-        case SORT_TYPE::LEFT:
-            cone_vec_ptr = &left_cones;
-            cone_vec_ptr->clear();
-            for (auto iter = cones.begin(); iter != cones.end(); iter++) {
-                if ((*iter).get_orientation() > 0) {
-                    cone_vec_ptr->push_back(*iter);
-                    cones.erase(iter);
-                    break;
-                }
-            }
-            ROS_INFO("sorting left");
-            break;
-
-        case SORT_TYPE::RIGHT:
-            ROS_INFO("sorting right");
-            cone_vec_ptr = &right_cones;
-            cone_vec_ptr->clear();
-            for (auto iter = cones.begin(); iter != cones.end(); iter++) {
-                if ((*iter).get_orientation() < 0) {
-                    cone_vec_ptr->push_back(*iter);
-                    cones.erase(iter);
-                    break;
-                }
-            }
-            compare_orientation = 1;
-            break;
-    }
-
-
-
-    // take the closest cone to the previous cone as next element
-    // until exceed threshold distance
-    double min_dist = cones_max_distance;
-    do {
-        min_dist = cones_max_distance;
-        auto min_iter = cones.begin();
-        for (auto iter = cones.begin(); iter != cones.end(); iter++) {
-            double this_dist = (*iter) - cone_vec_ptr->front();
-            if (this_dist < min_dist) {
-                min_dist = this_dist;
-                min_iter = iter;
-            }
-        }
-        ROS_INFO_STREAM("min_dist:" << min_dist);
-        if (min_dist < cones_max_distance) {
-            cone_vec_ptr->back().set_orientation(cone_vec_ptr->back() / (*min_iter));
-            cone_vec_ptr->push_back(*min_iter);
-            cones.erase(min_iter);
-            ROS_INFO_STREAM("cone size:" << cones.size());
-        } else {
-            break;
-        }
-    } while (min_dist < cones_max_distance);
-
-    ROS_INFO("sort done");
-    // check number of valid cones
-    return cone_vec_ptr->size() >= 2;
-
 }
 
 /**
@@ -336,6 +269,29 @@ bool pathfinder::read_parameters() {
     double_ptr = &clearance_radius;
     status = status && n.getParam("/" + package_name + "/" + parameter_name, *double_ptr);
 
+    parameter_name = "ranges_topic";
+    str_ptr = &ranges_topic_name;
+    status = status && n.getParam("/" + package_name + "/" + parameter_name, *str_ptr);
+
+    parameter_name = "publish_ranges";
+    bool_ptr = &publish_ranges;
+    status = status && n.getParam("/" + package_name + "/" + parameter_name, *bool_ptr);
+
+    parameter_name = "boundary_topic";
+    str_ptr = &boundary_topic_name;
+    status = status && n.getParam("/" + package_name + "/" + parameter_name, *str_ptr);
+
+    parameter_name = "publish_boundary";
+    bool_ptr = &publish_boundary;
+    status = status && n.getParam("/" + package_name + "/" + parameter_name, *bool_ptr);
+
+    parameter_name = "apply_median_filter";
+    bool_ptr = &apply_median_filter;
+    status = status && n.getParam("/" + package_name + "/" + parameter_name, *bool_ptr);
+
+    parameter_name = "filter_size";
+    int_ptr = &filter_size;
+    status = status && n.getParam("/" + package_name + "/" + parameter_name, *int_ptr);
 
     return status;
 }
@@ -396,6 +352,18 @@ bool pathfinder::setup_publishers() {
         cones_pub = n.advertise<visualization_msgs::MarkerArray>(cones_topic_name, 1);
     }
 
+    if (publish_ranges) {
+        status = status && !ranges_topic_name.empty();
+        assert(!ranges_topic_name.empty());
+        ranges_pub = n.advertise<visualization_msgs::MarkerArray>(ranges_topic_name, 1);
+    }
+
+    if (publish_boundary) {
+        status = status && !boundary_topic_name.empty();
+        assert(!boundary_topic_name.empty());
+        boundary_pub = n.advertise<visualization_msgs::MarkerArray>(boundary_topic_name, 1);
+    }
+
     return status;
 }
 
@@ -453,64 +421,16 @@ void pathfinder::laser_cb(sensor_msgs::LaserScanConstPtr msg) {
     // load ros sensor msg into range_1d
     has_new_laserscan = true;
     try {
-        laserscan = range_1d(msg, 110.0, -110.0);
+        laserscan = range_1d(msg, 90.0, -90.0);
     } catch (const std::exception &e) {
         std::cerr << e.what();
         exit(-1);
     }
-//    laserscan.median_filter(5);
-    std::cout << "get new laserscan" << std::endl;
-}
 
-/**
- * pathfinder::drive
- *
- * @return true if success; false otherwise.
- */
-bool pathfinder::drive1() {
-    sort_cones(SORT_TYPE::LEFT);
-    sort_cones(SORT_TYPE::RIGHT);
-    double mean_ori_left = 0;
-    double mean_ori_right = 0;
-    int sign = 1;
-
-    // get mean orientation of left track
-    for (auto iter = left_cones.begin(); iter != left_cones.end() - 1; iter++) {
-        mean_ori_left += (*iter).get_orientation();
+    if(apply_median_filter) {
+        laserscan.median_filter(filter_size);
     }
-    mean_ori_left /= (left_cones.size() - 1);
-//    std::cout << "left" << std::endl;
-    // get mean orientation of right track
-    for (auto iter = right_cones.begin(); iter != right_cones.end() - 1; iter++) {
-        mean_ori_right += (*iter).get_orientation();
-    }
-    mean_ori_right /= (right_cones.size() - 1);
-//    std::cout << "right" << std::endl;
-    // get sign based on mean orientation
-    if ((mean_ori_right + mean_ori_left) / 2.0 > 0) {
-        sign = -1;    // curving to right
-
-    } else {
-        sign = 1;     // curving to left
-    }
-//    std::cout << "sign:" << sign << std::endl;
-    // get minimum allowable steering angle
-    double min_angle = check_outer_track(sign);
-//    std::cout << "outer" << std::endl;
-    // get maximum allowable steering angle
-    double max_angle = check_inner_track(sign);
-//    std::cout << "inner" << std::endl;
-    // invalid steering angle
-    if (min_angle > max_angle) {
-        stop();
-        return false;
-    }
-
-    // control car using the mean of the allowable range
-    double mean_angle = (min_angle + max_angle) / 2.0;
-    curve(mean_angle);
-    return true;
-
+//    std::cout << "get new laserscan" << std::endl;
 }
 
 bool pathfinder::drive2() {
@@ -592,11 +512,11 @@ bool pathfinder::drive2() {
     }
 
 
-    std::cout<<"range used:"<<std::endl;
-    std::cout<<"    max: "<< desired_range_iter->get_max()<<std::endl;
-    std::cout<<"    min: "<< desired_range_iter->get_min()<<std::endl;
-    std::cout<<"    size: "<< desired_range_iter->get_size()<<std::endl;
-    std::cout<<"    mean: "<< desired_range_iter->get_mean()<<std::endl;
+//    std::cout<<"range used:"<<std::endl;
+//    std::cout<<"    max: "<< desired_range_iter->get_max()<<std::endl;
+//    std::cout<<"    min: "<< desired_range_iter->get_min()<<std::endl;
+//    std::cout<<"    size: "<< desired_range_iter->get_size()<<std::endl;
+//    std::cout<<"    mean: "<< desired_range_iter->get_mean()<<std::endl;
     double steering_angle = desired_range_iter->get_mean();
     if(steering_angle < -max_steering) {
         steering_angle = -max_steering;
@@ -607,105 +527,6 @@ bool pathfinder::drive2() {
     // drive using mean steering for that range
     curve(steering_angle);
     return true;
-}
-
-/**
- * pathfinder::check_outer_track
- *
- * @param sign - 1 for driving left; -1 for driving right
- * @return minimum allowable steering angle
- */
-double pathfinder::check_outer_track(int sign) {
-    std::vector<cone_2d> *cone_vec_ptr = nullptr;
-    cone_2d center_point;
-
-    // select vector based on sign
-    switch (sign) {
-        case 1:
-            cone_vec_ptr = &left_cones;
-            break;
-
-        case -1:
-            cone_vec_ptr = &right_cones;
-            break;
-
-        default:
-            exit(-1);
-    }
-
-    // get minimum allowable angle following outer track
-    double min_angle = 361.0;
-    {
-        auto r_iter = r_meter.begin();
-        auto a_iter = angle_degree.begin();
-        for (; r_iter != r_meter.end(); r_iter++, a_iter++) {
-            bool got_desired = false;
-            center_point.set_x(0.0);
-            center_point.set_y((double) sign * (*r_iter));
-            for (auto p_iter = cone_vec_ptr->begin(); p_iter != cone_vec_ptr->end(); p_iter++) {
-                if (center_point - (*p_iter) <= (*r_iter + cones_max_distance)) {
-                    got_desired = true;
-                    break;
-                }
-            }
-            if (got_desired) {
-                min_angle = *(r_iter - 1);
-            }
-        }
-    }
-
-    return min_angle * (double) sign;
-}
-
-/**
- * pathfinder::check_inner_track
- *
- * @param sign - 1 for driving left; -1 for driving right
- * @return maximum allowable steering angle
- */
-double pathfinder::check_inner_track(int sign) {
-    std::vector<cone_2d> *cone_vec_ptr = nullptr;
-    cone_2d center_point;
-
-    // select vector based on sign
-    switch (sign) {
-        case 1:
-            cone_vec_ptr = &right_cones;
-            break;
-
-        case -1:
-            cone_vec_ptr = &left_cones;
-            break;
-
-        default:
-            exit(-1);
-    }
-    std::cout << "switch in inner" << std::endl;
-
-    // get maximum allowable steering angle following inner track
-    double max_angle = 0.0;
-    {
-        auto r_iter = r_meter.rbegin();
-        auto a_iter = angle_degree.rbegin();
-        for (; r_iter != r_meter.rend(); r_iter++, a_iter++) {
-            //std::cout<<"reverse iterator"<<std::endl;
-            bool got_desired = false;
-            center_point.set_x(0.0);
-            center_point.set_y((double) sign * (*r_iter));
-            for (auto p_iter = cone_vec_ptr->begin(); p_iter != cone_vec_ptr->end(); p_iter++) {
-                if (center_point - (*p_iter) <= (*r_iter + cones_max_distance)) {
-                    got_desired = true;
-                    break;
-                }
-            }
-
-            if (got_desired) {
-                max_angle = *(r_iter + 1);
-            }
-        }
-    }
-
-    return max_angle * (double) sign;
 }
 
 /**
@@ -757,10 +578,10 @@ bool pathfinder::find_cones() {
         } else {
             if (!cluster.push(current_angle, laserscan[current_angle], clustering_threshold)) {
                 if (cluster.size() < clustering_threshold && cluster.size() > 0.05) {
-                    std::cout << "cluster size: " << cluster.size() << std::endl;
-                    std::cout << "x: " << cluster.get_x() << " y: " << cluster.get_y() << std::endl;
-                    std::cout << "from " << cluster.getClosest_distance() << " to " << cluster.getFarthest_distance()
-                              << std::endl;
+//                    std::cout << "cluster size: " << cluster.size() << std::endl;
+//                    std::cout << "x: " << cluster.get_x() << " y: " << cluster.get_y() << std::endl;
+//                    std::cout << "from " << cluster.getClosest_distance() << " to " << cluster.getFarthest_distance()
+//                              << std::endl;
                     clusters.push_back(cluster);
                 }
                 cluster = range_1d_cluster(current_angle, laserscan[current_angle]);
@@ -1027,45 +848,45 @@ visualization_msgs::MarkerArray pathfinder::_get_clear_markers(std::string frame
 bool pathfinder::update_steering_ranges(cone_2d &cone) {
     double min_steering = evaluate_boundary_steering(cone.get_x(), cone.get_y(), -clearance_radius);
     double max_steering = evaluate_boundary_steering(cone.get_x(), cone.get_y(), clearance_radius);
-    std::cout<<"\nx:"<<cone.get_x()<<" y:"<<cone.get_y()<<std::endl;
-    std::cout<<"max steering:"<<max_steering<<std::endl;
-    std::cout<<"min steering:"<<min_steering<<std::endl;
-    std::cout<<"check and combine ranges:"<<std::endl;
+//    std::cout<<"\nx:"<<cone.get_x()<<" y:"<<cone.get_y()<<std::endl;
+//    std::cout<<"max steering:"<<max_steering<<std::endl;
+//    std::cout<<"min steering:"<<min_steering<<std::endl;
+//    std::cout<<"check and combine ranges:"<<std::endl;
     int count = 0;
     for (auto ranges_iter = valid_ranges.begin(); ranges_iter != valid_ranges.end();) {
-        std::cout<<"ranges no."<<count++<<std::endl;
-        std::cout<<"max:"<<ranges_iter->get_max()<<"\n";
-        std::cout<<"min:"<<ranges_iter->get_min()<<"\n";
+//        std::cout<<"ranges no."<<count++<<std::endl;
+//        std::cout<<"max:"<<ranges_iter->get_max()<<"\n";
+//        std::cout<<"min:"<<ranges_iter->get_min()<<"\n";
         // all good
         if (min_steering >= ranges_iter->get_max()) {
-            std::cout<<"all good min: "<<min_steering<<">="<<ranges_iter->get_max()<<std::endl;
+//            std::cout<<"all good min: "<<min_steering<<">="<<ranges_iter->get_max()<<std::endl;
             ranges_iter++;
             continue;
         }
 
         // all good
         if (max_steering <= ranges_iter->get_min()) {
-            std::cout<<"all good max: "<<max_steering<<"<="<<ranges_iter->get_min()<<std::endl;
+//            std::cout<<"all good max: "<<max_steering<<"<="<<ranges_iter->get_min()<<std::endl;
             ranges_iter++;
             continue;
         }
 
         // no common interval
         if (min_steering < ranges_iter->get_min() && max_steering > ranges_iter->get_max()) {
-            std::cout<<"no common:\n";
-            std::cout<<min_steering<<"<"<<ranges_iter->get_min()<<"&&"<<max_steering<<">"<<ranges_iter->get_max()<<std::endl;
+//            std::cout<<"no common:\n";
+//            std::cout<<min_steering<<"<"<<ranges_iter->get_min()<<"&&"<<max_steering<<">"<<ranges_iter->get_max()<<std::endl;
             ranges_iter = valid_ranges.erase(ranges_iter);
             if (valid_ranges.empty()) {
-                std::cout<<"no available ranges\n";
+//                std::cout<<"no available ranges\n";
                 return false;
             }
         }
 
         // split into two range
         if (min_steering >= ranges_iter->get_min() && max_steering <= ranges_iter->get_max()) {
-            std::cout<<"split into two\n";
-            std::cout<<"range:"<<min_steering<<" | "<<ranges_iter->get_min()<<'\n';
-            std::cout<<"range:"<<ranges_iter->get_max()<<" | "<<max_steering<<'\n';
+//            std::cout<<"split into two\n";
+//            std::cout<<"range:"<<min_steering<<" | "<<ranges_iter->get_min()<<'\n';
+//            std::cout<<"range:"<<ranges_iter->get_max()<<" | "<<max_steering<<'\n';
             steering_range smaller_range(ranges_iter->get_min(), min_steering, ranges_iter->get_front_rear_distance());
             ranges_iter->set_min(max_steering);
             valid_ranges.insert(ranges_iter, smaller_range);
@@ -1074,12 +895,12 @@ bool pathfinder::update_steering_ranges(cone_2d &cone) {
 
         // update steering
         if (max_steering <= ranges_iter->get_max()) {
-            std::cout<<"update min\n";
+//            std::cout<<"update min\n";
             ranges_iter->set_min(max_steering);
         }
 
         if (min_steering >= ranges_iter->get_min()) {
-            std::cout<<"update max\n";
+//            std::cout<<"update max\n";
             ranges_iter->set_max(min_steering);
         }
         ranges_iter++;
@@ -1091,13 +912,124 @@ bool pathfinder::update_steering_ranges(cone_2d &cone) {
 
 double pathfinder::evaluate_boundary_steering(double x, double y, double shift) {
     double _y = y + shift;
+//    int sign;
+//    if(_y<0.0) {
+//        sign = -1;
+//        _y = -_y;
+//    } else {
+//        sign = 1;
+//    }
+    x = x + DIST_LIDAR_TO_CAR;
     if (_y == 0.0) {
         return 0.0;
     }
     double len = x / sin(2 * atan2(x, _y)) - shift;
-    if (len < DIST_FRONT_TO_REAR) {
-        len = DIST_FRONT_TO_REAR;
+    if(len == 0.0) {
+        return 0.0;
+    }
+    double rad = DIST_FRONT_TO_REAR / len;
+    if (rad > 1.0) {
+        rad = 1.0;
+    }
+    else if (rad < -1.0) {
+        rad = -1.0;
     }
 
-    return asin(DIST_FRONT_TO_REAR / len);
+    return asin(rad);
+}
+
+bool pathfinder::visualise_ranges() {
+    // clear previous path
+    ranges_pub.publish(get_clear_markers(" "));
+    std_msgs::ColorRGBA color;
+    color.a = 1.0;
+    int count = 0;
+    // generate msg fro new path
+    visualization_msgs::MarkerArray markers;
+    for(auto iter = valid_ranges.begin(); iter != valid_ranges.end(); iter++) {
+        color.g = 0.0;
+        color.b = 1.0;
+        get_steering_marker(std::to_string(count++), iter->get_max(), markers, color);
+        get_steering_marker(std::to_string(count++), iter->get_min(), markers, color);
+
+        color.b = 0.0;
+        color.g = 1.0;
+        get_steering_marker(std::to_string(count++), iter->get_mean(), markers, color);
+    }
+
+    ranges_pub.publish(markers);
+
+    return false;
+}
+
+bool pathfinder::get_steering_marker(std::string name,
+                                     double steering,
+                                     visualization_msgs::MarkerArray& markers,
+                                     std_msgs::ColorRGBA color) {
+    double turning_radius = DIST_FRONT_TO_REAR / sin(steering);
+    double rot_vel = 5.0 / turning_radius;
+
+
+//    turning_radius = fabs(turning_radius);
+    for (int i = 0; i < num_of_path_points; i++) {
+        double time_spent = time_interval * (i + 1.0);
+        visualization_msgs::Marker marker;
+        marker.ns = name;
+        marker.header.frame_id = "base_link";
+        marker.action = visualization_msgs::Marker::ADD;
+        marker.type = visualization_msgs::Marker::ARROW;
+        marker.color = color;
+        marker.scale.x = 0.5;
+        marker.scale.y = 0.1;
+        marker.scale.z = 0.1;
+        marker.lifetime = ros::Duration(rate);
+        double yaw_change = time_spent * rot_vel;
+        tf::Quaternion q = tf::createQuaternionFromYaw(yaw_change);
+        tf::quaternionTFToMsg(q, marker.pose.orientation);
+//            marker.pose.position.z = 0.0;
+//        if(yaw_change > 0.0){
+//            marker.pose.position.x = sin(yaw_change) * turning_radius;
+//            marker.pose.position.y = turning_radius - cos(yaw_change) * turning_radius;
+//        }
+//        if(yaw_change < 0.0) {
+//            marker.pose.position.x = - sin(yaw_change) * turning_radius;
+//            marker.pose.position.y = - turning_radius + cos(yaw_change) * turning_radius;
+//        }
+        if(yaw_change == 0.0) {
+            marker.pose.position.x = time_spent*tar_linear_velocity;
+//                marker.pose.position.y = 0.0;
+        } else {
+            marker.pose.position.x = sin(yaw_change) * turning_radius;
+            marker.pose.position.y = turning_radius - cos(yaw_change) * turning_radius;
+        }
+        marker.id = i;
+        markers.markers.push_back(marker);
+    }
+
+    return false;
+}
+
+bool pathfinder::visualise_boundary() {
+    int count = 0;
+    double steering;
+    visualization_msgs::MarkerArray markers;
+    std_msgs::ColorRGBA color;
+    color.a = 1.0;
+    for(auto iter = left_cones.begin(); iter != left_cones.end(); iter++) {
+        steering = evaluate_boundary_steering(iter->get_x(), iter->get_y(), -clearance_radius);
+        color.b = 1.0;
+        color.g = 1.0;
+        color.r = 0.0;
+        get_steering_marker(std::to_string(count++),steering,markers, color);
+
+
+        steering = evaluate_boundary_steering(iter->get_x(), iter->get_y(), clearance_radius);
+        color.b = 0.0;
+        color.g = 0.0;
+        color.r = 1.0;
+        get_steering_marker(std::to_string(count++),steering,markers, color);
+    }
+
+    boundary_pub.publish(markers);
+    return false;
 }

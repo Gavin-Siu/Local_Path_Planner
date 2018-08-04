@@ -38,4 +38,16 @@
 
   ideal_range_size: 0.3
 
+  ranges_topic: "/pathfinder/ranges"
+
+  publish_ranges: true
+
+  publish_boundary: true
+
+  boundary_topic: "/pathfinder/boundary"
+
+  apply_median_filter: true
+
+  filter_size: 3
+
 
