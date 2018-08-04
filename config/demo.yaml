@@ -1,17 +1,41 @@
 /pathfinder:
-  spin_rate: 10
-  cones_max_distance: 1.5
-  odom_topic: "/pose"
-  cones_topic: "/cones"
-  use_laserscan: false
-  laser_topic: "/scan"
-  cmdvel_topic: "/rossae/cmdvel"
-  path_topic: "/pathfinder/path"
-  clustering_threshold: 1.0
-  publish_cones: true
-  publish_path: true
-  num_of_path_points: 5
-  time_interval: 0.2
-  frame_id: "laser"
+  spin_rate: 10                       # operating rate of this node
+
+  cones_max_distance: 1.5             # constant used for sorting cones into two side of track
+
+  odom_topic: "/pose"                 # topic to receive pose
+
+  cones_topic: "/cones"               # topic to receive cones markers
+
+  use_laserscan: true                # enable/disable use of raw laserscan data
+
+  laser_topic: "/scan"                # topic to receive raw laserscan
+
+  cmdvel_topic: "/rossae/cmdvel"      # topic to publish control command
+
+  path_topic: "/pathfinder/path"      # topic to publish path markers
+
+  clustering_threshold: 0.3           # constant used for cone clustering
+
+  publish_cones: true                 # enable/disable cones visualisation (only valid when use_laserscan is true)
+
+  publish_path: true                  # enable/disable path visualisation
+
+  num_of_path_points: 10               # num of points for path visualisation
+
+  time_interval: 0.2                  # time interval between each path point
+
+  frame_id: "laser"                   # should be same as frame id used in laser_topic
+
+  mode: 2                             # 1: sort cones into two side of tracks and drive;
+                                      # 2: search for largest open space and drive
+
+  max_steering: 24.0                  # in degree (positive)
+
+  processing_range: 10.0               # in meter (drop all data outside this range)
+
+  clearance_radius: 1.0               # in meter (collision free boundary)
+
+  ideal_range_size: 0.3
 
 

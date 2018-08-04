@@ -14,68 +14,13 @@
 #include <tf/tf.h>
 #include <exception>
 
-#define DIST_LIDAR_TO_CAR 1.7
+#include <pathfinder/cone_2d.h>
+#include <pathfinder/range_1d_cluster.h>
+#include <pathfinder/range_1d.h>
+#include <pathfinder/enum_def.h>
+#include <pathfinder/steering_range.h>
+
 #define DIST_FRONT_TO_REAR 1.8
-
-struct point_2d {
-    double x;
-    double y;
-    double dist;
-    double half_diameter;
-    double orientation;
-
-    point_2d() = default;
-
-    point_2d(double _x, double _y, double _half_diameter);
-
-    bool operator<(const point_2d &a) const;
-
-    double operator-(const point_2d &a) const;
-
-    double operator/(const point_2d &a) const;
-};
-
-struct range_1d {
-    std::vector<double> ranges;
-    double max_range;
-    double min_angle;
-    double max_angle;
-    double resolution;
-
-    double &operator[](double angle);
-
-    range_1d() = default;
-
-    range_1d(sensor_msgs::LaserScanConstPtr ls_ptr);
-
-    range_1d(sensor_msgs::LaserScanConstPtr ls_ptr, double desired_angle_max, double desired_angle_min);
-};
-
-struct range_1d_cluster {
-    double start_angle;
-    double end_angle;
-    double closest_distance;
-    double farthest_distance;
-
-    range_1d_cluster() {};
-
-    range_1d_cluster(double angle, double distance);
-
-    bool push(double angle, double distance, double threshold);
-
-    double mean_angle();
-
-    double size();
-
-    double get_x();
-
-    double get_y();
-};
-
-enum class sort_type {
-    left,
-    right
-};
 
 class pathfinder {
 public:
@@ -100,11 +45,17 @@ private:
 
     bool setup_publishers();
 
-    bool drive();
+    bool drive1();
+
+    bool drive2();
+
+    bool update_steering_ranges(cone_2d& cone);
+
+    double evaluate_boundary_steering(double x, double y, double shift);
 
     void stop();
 
-    void curve(double angle, int sign);
+    void curve(double angle);
 
     void odom_cb(nav_msgs::OdometryConstPtr msg);
 
@@ -114,7 +65,7 @@ private:
 
     bool find_cones();
 
-    bool sort_cones(sort_type st);
+    bool sort_cones(SORT_TYPE st);
 
     double check_outer_track(int sign);
 
@@ -122,7 +73,9 @@ private:
 
     bool visualise_path(double time_interval, int num_of_points);
 
-	bool visualise_cones(std::vector<point_2d> tar_cones, std::string name = "all");
+	bool visualise_cones(std::vector<cone_2d> &tar_cones, std::string name, MARKER_COLOR color);
+
+	bool visualise_cones(std::list<cone_2d> &tar_cones, std::string name, MARKER_COLOR color);
 
     visualization_msgs::MarkerArray& get_clear_markers(std::string name);
 
@@ -131,6 +84,8 @@ private:
     ros::NodeHandle n;
     int spin_rate;
     ros::Rate rate;
+
+    int mode;
 
     double cur_x;
     double cur_y;
@@ -142,10 +97,16 @@ private:
     double tar_rotate_velocity;
     double tar_steering_angle;
 
-    std::vector<point_2d> cones;
-    std::vector<point_2d> left_cones;
-    std::vector<point_2d> right_cones;
+    std::list<cone_2d> cones;
+    std::vector<cone_2d> left_cones;
+    std::vector<cone_2d> right_cones;
+    std::vector<cone_2d> invalid_cones;
+
+    steering_range initial_range;
+    std::list<steering_range> valid_ranges;
     double cones_max_distance;
+    double clearance_radius;
+    double max_steering;
 
     bool has_new_cone;
     bool has_new_laserscan;
@@ -161,6 +122,8 @@ private:
     bool publish_path;
     int num_of_path_points;
     double time_interval;
+
+    double processing_range;
 
     std::string frame_id;
 
@@ -179,8 +142,6 @@ private:
 
     ros::Publisher path_pub;
     std::string path_topic_name;
-    
-
 };
 
 #endif //PROJECT_PATHFINDER_H

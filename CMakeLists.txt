@@ -122,12 +122,25 @@ include_directories(
         ${catkin_INCLUDE_DIRS}
 )
 
+set(SRC
+        src/pathfinder.cpp
+        include/pathfinder/pathfinder.h
+        src/cone_2d.cpp
+        include/pathfinder/cone_2d.h
+        src/range_1d.cpp
+        include/pathfinder/range_1d.h
+        src/range_1d_cluster.cpp
+        include/pathfinder/range_1d_cluster.h
+        include/pathfinder/enum_def.h
+        include/pathfinder/steering_range.h
+        src/steering_range.cpp)
+
 ## Declare a C++ library
 # add_library(${PROJECT_NAME}
 #   src/${PROJECT_NAME}/pathfinder.cpp
 # )
 
-add_executable(demo src/main_demo.cpp src/pathfinder.cpp)
+add_executable(demo src/main_demo.cpp ${SRC})
 target_link_libraries(demo ${catkin_LIBRARIES})
 
 ## Add cmake target dependencies of the library
