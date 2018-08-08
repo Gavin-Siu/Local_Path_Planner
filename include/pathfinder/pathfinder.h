@@ -101,6 +101,8 @@ private:
     double tar_linear_velocity;
     double tar_rotate_velocity;
     double tar_steering_angle;
+    
+    double fix_driving_speed;
 
     std::list<cone_2d> cones;
     std::vector<cone_2d> left_cones;

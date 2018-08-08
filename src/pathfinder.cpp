@@ -292,6 +292,11 @@ bool pathfinder::read_parameters() {
     parameter_name = "filter_size";
     int_ptr = &filter_size;
     status = status && n.getParam("/" + package_name + "/" + parameter_name, *int_ptr);
+    
+    parameter_name = "driving_speed";
+    double_ptr = &fix_driving_speed;
+    status = status && n.getParam("/" + package_name + "/" + parameter_name, *double_ptr);
+
 
     return status;
 }
@@ -551,7 +556,7 @@ void pathfinder::stop() {
 void pathfinder::curve(double angle) {
     // curve
     geometry_msgs::Twist cmdvel;
-    cmdvel.linear.x = 5.0;
+    cmdvel.linear.x = fix_driving_speed;
     cmdvel.angular.z = angle;
     tar_linear_velocity = cmdvel.linear.x;
     tar_steering_angle = cmdvel.angular.z;

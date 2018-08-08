@@ -32,9 +32,9 @@
 
   max_steering: 24.0                  # in degree (positive)
 
-  processing_range: 10.0               # in meter (drop all data outside this range)
+  processing_range: 5.0               # in meter (drop all data outside this range)
 
-  clearance_radius: 1.0               # in meter (collision free boundary)
+  clearance_radius: 0.80               # in meter (collision free boundary)
 
   ideal_range_size: 0.3
 
@@ -46,8 +46,9 @@
 
   boundary_topic: "/pathfinder/boundary"
 
-  apply_median_filter: true
+  apply_median_filter: false
 
   filter_size: 3
 
+  driving_speed: 3.0 
 
