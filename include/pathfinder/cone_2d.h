@@ -34,11 +34,8 @@ public:
 
     double get_half_diameter() const;
 
+
     void set_half_diameter(double half_diameter);
-
-    int get_mode() const;
-
-    void set_mode(int mode);
 
     double get_dist_to_point(point_2d tar_point);
 
@@ -46,13 +43,10 @@ public:
 
     double get_max_collision_steering(double front_to_rear_distance, double clearance_radius);
 
-private:
-
-    int mode;
-
-public:
     cone_2d() = default;
-    cone_2d(double x, double y, double half_diameter, int mode = 2);
+
+    cone_2d(double x, double y, double half_diameter);
+
     ~cone_2d();
 
     void set_x(double value);

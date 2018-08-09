@@ -46,7 +46,10 @@ public:
 
     range_1d(sensor_msgs::LaserScanConstPtr ls_ptr);
 
-    range_1d(sensor_msgs::LaserScanConstPtr ls_ptr, double desired_angle_max, double desired_angle_min);
+    range_1d(sensor_msgs::LaserScanConstPtr ls_ptr,
+             double desired_angle_max,
+             double desired_angle_min,
+             double processing_range);
 };
 
 

@@ -7,6 +7,7 @@
 
 #include <ros/ros.h>
 #include <ros/package.h>
+#include <std_msgs/Bool.h>
 #include <geometry_msgs/Twist.h>
 #include <visualization_msgs/MarkerArray.h>
 #include <nav_msgs/Odometry.h>
@@ -36,8 +37,6 @@ public:
 
     bool Start();
 
-    bool Stop();
-
 private:
     bool read_parameters();
 
@@ -45,7 +44,7 @@ private:
 
     bool setup_publishers();
 
-	bool drive2();
+	bool drive();
 
     bool update_steering_ranges(cone_2d& cone);
 
@@ -61,15 +60,13 @@ private:
 
     void laser_cb(sensor_msgs::LaserScanConstPtr msg);
 
+    void ctrl_cb(std_msgs::BoolConstPtr msg);
+
     bool find_cones();
 
-	bool visualise_path(double time_interval, int num_of_points);
+	bool visualise_path();
 
 	bool visualise_cones(std::vector<cone_2d> &tar_cones,
-                         std::string name,
-                         MARKER_COLOR color);
-
-	bool visualise_cones(std::list<cone_2d> &tar_cones,
                          std::string name,
                          MARKER_COLOR color);
 
@@ -90,8 +87,8 @@ private:
     int spin_rate;
     ros::Rate rate;
 
-    int mode;
-
+    double desired_speed;
+    double applied_speed;
     double cur_x;
     double cur_y;
     double orientation;
@@ -103,13 +100,10 @@ private:
     double tar_steering_angle;
 
     std::list<cone_2d> cones;
-    std::vector<cone_2d> left_cones;
-    std::vector<cone_2d> right_cones;
-    std::vector<cone_2d> invalid_cones;
+    std::vector<cone_2d> valid_cones;
 
     steering_range initial_range;
     std::list<steering_range> valid_ranges;
-    double cones_max_distance;
     double clearance_radius;
     double max_steering;
 
@@ -157,6 +151,10 @@ private:
     ros::Publisher boundary_pub;
     std::string boundary_topic_name;
     bool publish_boundary;
+
+    ros::Subscriber ctrl_sub;
+    std::string ctrl_topic_name;
+    bool ctrl_by_topic;
 };
 
 #endif //PROJECT_PATHFINDER_H

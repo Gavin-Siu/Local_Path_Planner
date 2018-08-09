@@ -32,7 +32,7 @@ point_2d::point_2d(double x, double y):x(x),y(y) {}
 
 
 
-cone_2d::cone_2d(double x, double y, double half_diameter, int mode):half_diameter(half_diameter), mode(mode) {
+cone_2d::cone_2d(double x, double y, double half_diameter):half_diameter(half_diameter) {
     point = new point_2d(x,y);
     dist_to_car = *point - point_2d(0,0);
     dist_to_left = *point - point_2d(0,4.0);
@@ -40,17 +40,7 @@ cone_2d::cone_2d(double x, double y, double half_diameter, int mode):half_diamet
 }
 
 bool cone_2d::operator<(const cone_2d &a) const {
-    switch(mode) {
-        case 1:
-            return dist_to_car < a.dist_to_car;
-
-        case 2:
-            return dist_to_left < a.dist_to_left;
-
-        default:
-            assert(false);
-            exit(-1);
-    }
+    return dist_to_left < a.dist_to_left;
 }
 
 double cone_2d::operator-(const cone_2d &a) const {
@@ -111,14 +101,6 @@ double cone_2d::get_half_diameter() const {
 
 void cone_2d::set_half_diameter(double half_diameter) {
     cone_2d::half_diameter = half_diameter;
-}
-
-int cone_2d::get_mode() const {
-    return mode;
-}
-
-void cone_2d::set_mode(int mode) {
-    cone_2d::mode = mode;
 }
 
 double cone_2d::get_dist_to_point(point_2d tar_point) {

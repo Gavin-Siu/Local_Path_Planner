@@ -55,7 +55,7 @@ range_1d::range_1d(sensor_msgs::LaserScanConstPtr ls_ptr) {
  * @param desired_angle_max - maximum constrains in angle
  * @param desired_angle_min - minimum constrains in angle
  */
-range_1d::range_1d(sensor_msgs::LaserScanConstPtr ls_ptr, double desired_angle_max, double desired_angle_min) {
+range_1d::range_1d(sensor_msgs::LaserScanConstPtr ls_ptr, double desired_angle_max, double desired_angle_min, double processing_range) {
     desired_angle_max = desired_angle_max / 180.0 *M_PI;
     desired_angle_min = desired_angle_min / 180.0 *M_PI;
     max_range = ls_ptr->range_max;
@@ -66,13 +66,12 @@ range_1d::range_1d(sensor_msgs::LaserScanConstPtr ls_ptr, double desired_angle_m
         min_angle = ls_ptr->angle_min;
         assert(max_angle > desired_angle_max);
         assert(min_angle < desired_angle_min);
-//        std::cout<<max_angle<<" | "<<desired_angle_max<<std::endl;
-//        std::cout<<min_angle<<" | "<<desired_angle_min<<std::endl;
+
         int begin_index = (int) ((desired_angle_min - min_angle) / resolution);
         int end_index = (int) ((desired_angle_max - min_angle) / resolution) + 1;
         size_t num_points = end_index - begin_index;
         ranges.reserve(num_points);
-        //std::cout<<begin_index<<" | "<< num_points<<" | "<<end_index<<std::endl;
+
         for (int i = begin_index; i != end_index; i++) {
             ranges.push_back(ls_ptr->ranges[i]);
         }
@@ -84,8 +83,6 @@ range_1d::range_1d(sensor_msgs::LaserScanConstPtr ls_ptr, double desired_angle_m
         min_angle = ls_ptr->angle_max;
         assert(max_angle > desired_angle_max);
         assert(min_angle < desired_angle_min);
-//        std::cout<<max_angle<<" | "<<desired_angle_max<<std::endl;
-//        std::cout<<min_angle<<" | "<<desired_angle_min<<std::endl;
         int rbegin_index = (int) ((max_angle - desired_angle_min) / resolution);
         int rend_index = (int) ((max_angle - desired_angle_max) / resolution) - 1;
 
@@ -93,16 +90,12 @@ range_1d::range_1d(sensor_msgs::LaserScanConstPtr ls_ptr, double desired_angle_m
         ranges.reserve(num_points);
         //std::cout<<rbegin_index<<" | "<< num_points<<" | "<<rend_index<<std::endl;
         for (int i = rbegin_index; i > rend_index; i--) {
+            if(ranges[i] > processing_range) {
+                ranges[i] = max_range;
+            }
             ranges.push_back(ls_ptr->ranges[i]);
-//                std::cout<<i<<":"<<ls_ptr->ranges[i]<<std::endl;
         }
 
-//        for (int i = 0; i < 541; i ++) {
-//            std::cout<<i<<":"<<ls_ptr->ranges[i]<<std::endl;
-//
-//        }
-//        std::cout<<ls_ptr->ranges.size()<<std::endl;
-//        exit(-1);
         max_angle = desired_angle_max;
         min_angle = desired_angle_min;
     } else {

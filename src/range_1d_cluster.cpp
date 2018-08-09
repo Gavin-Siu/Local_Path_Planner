@@ -14,9 +14,11 @@
  */
 range_1d_cluster::range_1d_cluster(double angle, double distance) {
     start_angle = angle;
+    closest_angle = angle;
     end_angle = angle;
     farthest_distance = distance;
     closest_distance = distance;
+    last_distance = distance;
 }
 
 /**
@@ -28,11 +30,7 @@ range_1d_cluster::range_1d_cluster(double angle, double distance) {
  * @return true if the new element is accepted; false otherwise.
  */
 bool range_1d_cluster::push(double angle, double distance, double threshold) {
-    if (distance < (closest_distance - threshold)) {
-        return false;
-    }
-
-    if (distance > (farthest_distance + threshold)) {
+    if(fabs(distance - last_distance) > threshold) {
         return false;
     }
 
@@ -46,6 +44,7 @@ bool range_1d_cluster::push(double angle, double distance, double threshold) {
         farthest_distance = distance;
     } else if (distance < closest_distance) {
         closest_distance = distance;
+        closest_angle = angle;
     }
 
     return true;
@@ -75,7 +74,7 @@ double range_1d_cluster::size() {
  * @return x value of the center of the cluster
  */
 double range_1d_cluster::get_x() {
-    return cos(mean_angle()) * closest_distance;
+    return cos(closest_angle) * closest_distance;
 }
 
 /**
@@ -84,7 +83,7 @@ double range_1d_cluster::get_x() {
  * @return y value of the center of the cluster
  */
 double range_1d_cluster::get_y() {
-    return sin(mean_angle()) * closest_distance;
+    return sin(closest_angle) * closest_distance;
 }
 
 double range_1d_cluster::getStart_angle() const {
@@ -101,4 +100,17 @@ double range_1d_cluster::getClosest_distance() const {
 
 double range_1d_cluster::getFarthest_distance() const {
     return farthest_distance;
+}
+
+bool range_1d_cluster::load_cones(std::list<cone_2d> cones, double clearance_radius) {
+    int num_of_points = (int) ceil(size() / (2*clearance_radius))+1;
+    double interval = (end_angle - start_angle) / (double)(num_of_points-1);
+    for(int i = 0; i < num_of_points; i ++) {
+        double angle = start_angle+(double) (i*interval);
+        double x = cos(angle) * closest_distance;
+        double y = sin(angle) * closest_distance;
+//        cones.emplace_back(x,y,)
+    }
+
+    return false;
 }
