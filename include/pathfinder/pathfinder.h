@@ -77,6 +77,7 @@ private:
 	visualization_msgs::MarkerArray _get_clear_markers(std::string frame_id);
 
 	bool get_steering_marker(std::string name,
+							 double speed,
                              double steering,
                              visualization_msgs::MarkerArray& markers,
                              std_msgs::ColorRGBA color);
