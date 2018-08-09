@@ -7,7 +7,7 @@
 
   filter_size: 3
 
-  clustering_threshold: 0.1           # constant used for cone clustering
+  clustering_threshold: 0.2           # constant used for cone clustering
 
   num_of_path_points: 5               # num of points for path visualisation
 
@@ -15,7 +15,7 @@
 
   max_steering: 24.0                  # in degree (positive)
 
-  processing_range: 1.5               # in meter (drop all data outside this range)
+  processing_range: 5.0               # in meter (drop all data outside this range)
 
   clearance_radius: 1.8               # in meter (collision free boundary)
 
