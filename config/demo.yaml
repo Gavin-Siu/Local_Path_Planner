@@ -50,5 +50,3 @@
   control_by_topic: false
 
   control_topic: "/pathfinder/control"
-
-
