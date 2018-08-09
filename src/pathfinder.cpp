@@ -127,6 +127,7 @@ bool pathfinder::Start() {
 
             if(publish_cones) {
                 visualise_cones(valid_cones, "valid_cones", MARKER_COLOR::RED);
+                ROS_INFO_STREAM("size of valid cones: "<<valid_cones.size());
             }
 
             if (publish_boundary) {
@@ -387,7 +388,6 @@ void pathfinder::cones_cb(visualization_msgs::MarkerArrayConstPtr msg) {
 //        TODO: find proper size of objects
         cones.emplace_back((*iter).pose.position.x, (*iter).pose.position.y, 0.5);
     }
-    cones.sort();
     ROS_INFO_STREAM("cones_size:" << cones.size());
 }
 
@@ -415,15 +415,20 @@ void pathfinder::laser_cb(sensor_msgs::LaserScanConstPtr msg) {
 }
 
 bool pathfinder::drive() {
+	
     // init range list
     valid_ranges.clear();
     valid_ranges.push_back(initial_range);
     valid_cones.clear();
+    bool stop_ = false;
+    
 
     // iterate through the cones and identify the collision free steering ranges
-    for (auto cones_iter = cones.begin(); cones_iter != cones.end();) {
+    for (auto cones_iter = cones.begin(); cones_iter != cones.end(); cones_iter++) {
         // check if the cone is outside of the processing range
-        if (cones_iter->get_dist_to_car() < processing_range) {
+        double dist_to_car = cones_iter->get_dist_to_point(point_2d(0.0,0.0));
+        ROS_INFO_STREAM("dist to car: "<<dist_to_car);
+        if (dist_to_car < processing_range) {
             valid_cones.push_back(*cones_iter);
             // if the cone is inside the processing range
             // calculate the boundary of collision steering at given cone location
@@ -431,12 +436,18 @@ bool pathfinder::drive() {
             if (!update_steering_ranges(*cones_iter)) {
                 // no available path
                 // stop and return false
-                stop();
-                return false;
+                stop_ = true;
+                continue;
             }
         }
 
     }
+    
+    if(stop_) {
+		stop();
+		return false;
+	}
+    
 
     // select the largest steering range (prefer as small change as possible to current steering)
     auto desired_range_iter = valid_ranges.begin();
@@ -471,9 +482,17 @@ bool pathfinder::drive() {
 
     double steering_angle = desired_range_iter->get_mean();
     if(steering_angle < -max_steering) {
-        steering_angle = -max_steering;
+		if(desired_range_iter->get_max() < -max_steering) {
+			stop();
+			return false;
+		}
+		steering_angle = -max_steering;
     }
     if(steering_angle > max_steering) {
+        if(desired_range_iter->get_min() > max_steering) {
+			stop();
+			return false;
+		}
         steering_angle = max_steering;
     }
     // drive using mean steering for that range
@@ -565,7 +584,7 @@ bool pathfinder::visualise_path() {
 
     // generate msg fro new path
     visualization_msgs::MarkerArray markers;
-    get_steering_marker(ns, tar_steering_angle, markers, color);
+    get_steering_marker(ns, tar_linear_velocity, tar_steering_angle, markers, color);
     path_pub.publish(markers);
 }
 
@@ -646,7 +665,7 @@ bool pathfinder::visualise_cones(std::vector<cone_2d> &tar_cones, std::string na
         marker.scale.x = 0.2;
         marker.scale.y = 0.2;
         marker.scale.z = 0.5;
-        //marker.lifetime = ros::Duration(rate);
+        marker.lifetime = ros::Duration(rate);
         tf::poseTFToMsg(tf::Transform(tf::createQuaternionFromRPY(0.0, 0.0, 0.0),
                                       tf::Vector3(tar_cones[i].get_x(), tar_cones[i].get_y(), 0.0)),
                         marker.pose);
@@ -675,6 +694,7 @@ visualization_msgs::MarkerArray pathfinder::_get_clear_markers(std::string frame
 bool pathfinder::update_steering_ranges(cone_2d &cone) {
     double min_steering = evaluate_boundary_steering(cone.get_x(), cone.get_y(), -clearance_radius-cone.get_half_diameter());
     double max_steering = evaluate_boundary_steering(cone.get_x(), cone.get_y(), clearance_radius+cone.get_half_diameter());
+    /*
     if (min_steering == INVALID_STEERING && max_steering == INVALID_STEERING) {
         return false;
     }
@@ -726,6 +746,7 @@ bool pathfinder::update_steering_ranges(cone_2d &cone) {
         }
     }
     else {
+    * */
         for (auto ranges_iter = valid_ranges.begin(); ranges_iter != valid_ranges.end();) {
             // all good
             if (min_steering >= ranges_iter->get_max()) {
@@ -765,7 +786,7 @@ bool pathfinder::update_steering_ranges(cone_2d &cone) {
                 ranges_iter->set_max(min_steering);
             }
             ranges_iter++;
-        }
+        //}
     }
     return true;
 }
@@ -783,11 +804,13 @@ double pathfinder::evaluate_boundary_steering(double x, double y, double shift) 
         return 0.0;
     }
     if(shift > 0.0) {
-        if(len < 0.0) {
+        if(len < 0.0 && len > -shift) {
+			ROS_INFO_STREAM(" shift:"<<shift<<",len:"<<len);
             return INVALID_STEERING;
         }
     } else if (shift < 0.0) {
-        if(len > 0.0) {
+        if(len > 0.0 && len < -shift) {
+			ROS_INFO_STREAM(" shift:"<<shift<<",len:"<<len);
             return INVALID_STEERING;
         }
     }
@@ -813,12 +836,12 @@ bool pathfinder::visualise_ranges() {
     for(auto iter = valid_ranges.begin(); iter != valid_ranges.end(); iter++) {
         color.g = 0.0;
         color.b = 1.0;
-        get_steering_marker(std::to_string(count++), iter->get_max(), markers, color);
-        get_steering_marker(std::to_string(count++), iter->get_min(), markers, color);
+        get_steering_marker(std::to_string(count++),desired_speed, iter->get_max(), markers, color);
+        get_steering_marker(std::to_string(count++),desired_speed, iter->get_min(), markers, color);
 
         color.b = 0.0;
         color.g = 1.0;
-        get_steering_marker(std::to_string(count++), iter->get_mean(), markers, color);
+        get_steering_marker(std::to_string(count++),desired_speed, iter->get_mean(), markers, color);
     }
 
     ranges_pub.publish(markers);
@@ -827,11 +850,12 @@ bool pathfinder::visualise_ranges() {
 }
 
 bool pathfinder::get_steering_marker(std::string name,
+									 double speed,
                                      double steering,
                                      visualization_msgs::MarkerArray& markers,
                                      std_msgs::ColorRGBA color) {
     double turning_radius = DIST_FRONT_TO_REAR / sin(steering);
-    double rot_vel = 5.0 / turning_radius;
+    double rot_vel = speed / turning_radius;
 
     for (int i = 0; i < num_of_path_points; i++) {
         double time_spent = time_interval * (i + 1.0);
@@ -850,7 +874,7 @@ bool pathfinder::get_steering_marker(std::string name,
         tf::quaternionTFToMsg(q, marker.pose.orientation);
 
         if(yaw_change == 0.0) {
-            marker.pose.position.x = time_spent*tar_linear_velocity;
+            marker.pose.position.x = time_spent*speed;
         } else {
             marker.pose.position.x = sin(yaw_change) * turning_radius;
             marker.pose.position.y = turning_radius - cos(yaw_change) * turning_radius;
@@ -873,14 +897,14 @@ bool pathfinder::visualise_boundary() {
         color.b = 1.0;
         color.g = 1.0;
         color.r = 0.0;
-        get_steering_marker(std::to_string(count++),steering,markers, color);
+        get_steering_marker(std::to_string(count++),desired_speed,steering,markers, color);
 
 
         steering = evaluate_boundary_steering(iter->get_x(), iter->get_y(), clearance_radius);
         color.b = 0.0;
         color.g = 0.0;
         color.r = 1.0;
-        get_steering_marker(std::to_string(count++),steering,markers, color);
+        get_steering_marker(std::to_string(count++),desired_speed,steering,markers, color);
     }
 
     boundary_pub.publish(markers);

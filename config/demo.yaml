@@ -7,7 +7,7 @@
 
   filter_size: 3
 
-  clustering_threshold: 0.2           # constant used for cone clustering
+  clustering_threshold: 0.1           # constant used for cone clustering
 
   num_of_path_points: 5               # num of points for path visualisation
 
@@ -15,9 +15,9 @@
 
   max_steering: 24.0                  # in degree (positive)
 
-  processing_range: 6.0               # in meter (drop all data outside this range)
+  processing_range: 1.5               # in meter (drop all data outside this range)
 
-  clearance_radius: 1.5               # in meter (collision free boundary)
+  clearance_radius: 1.8               # in meter (collision free boundary)
 
   ideal_range_size: 0.3
 
@@ -35,13 +35,13 @@
 
   publish_cones: true                 # enable/disable cones visualisation (only valid when use_laserscan is true)
 
-  publish_path: false                  # enable/disable path visualisation
+  publish_path: true                  # enable/disable path visualisation
 
   frame_id: "laser"                   # should be same as frame id used in laser_topic
 
   ranges_topic: "/pathfinder/ranges"
 
-  publish_ranges: false
+  publish_ranges: true
 
   publish_boundary: true
 
