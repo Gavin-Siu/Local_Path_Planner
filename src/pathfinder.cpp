@@ -256,11 +256,6 @@ bool pathfinder::read_parameters() {
     parameter_name = "filter_size";
     int_ptr = &filter_size;
     status = status && n.getParam("/" + package_name + "/" + parameter_name, *int_ptr);
-    
-    parameter_name = "driving_speed";
-    double_ptr = &fix_driving_speed;
-    status = status && n.getParam("/" + package_name + "/" + parameter_name, *double_ptr);
-
 
     parameter_name = "control_topic";
     str_ptr = &ctrl_topic_name;
