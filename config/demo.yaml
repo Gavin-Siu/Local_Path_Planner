@@ -1,7 +1,7 @@
 /pathfinder:
   spin_rate: 10                       # operating rate of this node
 
-  desired_speed: 3.0
+  desired_speed: 1.6
 
   apply_median_filter: false
 
@@ -15,7 +15,7 @@
 
   max_steering: 24.0                  # in degree (positive)
 
-  processing_range: 5.0               # in meter (drop all data outside this range)
+  processing_range: 3.0               # in meter (drop all data outside this range)
 
   clearance_radius: 1.8               # in meter (collision free boundary)
 
@@ -43,7 +43,7 @@
 
   publish_ranges: true
 
-  publish_boundary: true
+  publish_boundary: false
 
   boundary_topic: "/pathfinder/boundary"
 

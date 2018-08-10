@@ -444,8 +444,8 @@ bool pathfinder::drive() {
     }
     
     if(stop_) {
-		stop();
-		return false;
+		//stop();
+		//return false;
 	}
     
 
@@ -553,9 +553,9 @@ bool pathfinder::find_cones() {
             new_cluster = false;
         } else {
             if (!cluster.push(current_angle, laserscan[current_angle], clustering_threshold)) {
-//                if (cluster.getClosest_distance() >0.02 && cluster.size() > 0.05) {//cluster.size() < clustering_threshold && cluster.size() > 0.05) {
+                if (cluster.getClosest_distance() >0.01) {//cluster.size() < clustering_threshold && cluster.size() > 0.05) {
                     clusters.push_back(cluster);
-//                }
+                }
                 cluster = range_1d_cluster(current_angle, laserscan[current_angle]);
             }
         }
@@ -694,7 +694,7 @@ visualization_msgs::MarkerArray pathfinder::_get_clear_markers(std::string frame
 bool pathfinder::update_steering_ranges(cone_2d &cone) {
     double min_steering = evaluate_boundary_steering(cone.get_x(), cone.get_y(), -clearance_radius-cone.get_half_diameter());
     double max_steering = evaluate_boundary_steering(cone.get_x(), cone.get_y(), clearance_radius+cone.get_half_diameter());
-    /*
+    
     if (min_steering == INVALID_STEERING && max_steering == INVALID_STEERING) {
         return false;
     }
@@ -746,7 +746,7 @@ bool pathfinder::update_steering_ranges(cone_2d &cone) {
         }
     }
     else {
-    * */
+    
         for (auto ranges_iter = valid_ranges.begin(); ranges_iter != valid_ranges.end();) {
             // all good
             if (min_steering >= ranges_iter->get_max()) {
@@ -786,7 +786,7 @@ bool pathfinder::update_steering_ranges(cone_2d &cone) {
                 ranges_iter->set_max(min_steering);
             }
             ranges_iter++;
-        //}
+        }
     }
     return true;
 }
