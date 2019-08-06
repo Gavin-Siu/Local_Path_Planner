@@ -427,7 +427,7 @@ bool pathfinder::drive() {
     double steering_angle_spare[10] = {9999.9, 9999.9, 9999.9, 9999.9, 9999.9, 9999.9, 9999.9, 9999.9, 9999.9, 9999.9};
 
     /* while / for */
-    for (int i = 0; i < 10; i++) {
+    for (int index = 0; index < 10; index++) {
         /* estimate next position of car in xxx s */
 
         // cones.begin()->set_x()
@@ -439,21 +439,20 @@ bool pathfinder::drive() {
         cones_iter->set_y(YPos); */
 
         // iterate through the cones and identify the collision free steering ranges
-
         for (auto cones_iter = cones.begin(); cones_iter != cones.end(); cones_iter++) {
             /* update cones locations related to car's postion */
-             if (i != 0) {
+             if (index != 0) {
                  double cone_x = cones_iter->get_x();
                  double cone_y = cones_iter->get_y();
-                 std::cout << "steering_angle =" << steering_angle[i-1] << std::endl;
-                 if (fabs(steering_angle[i-1]) > 0.001) {
+//                 std::cout << "steering_angle =" << steering_angle[i-1] << std::endl;
+                 if (fabs(steering_angle[index-1]) > 0.001) {
 
-                     double steering_radius = DIST_FRONT_TO_REAR / sin(fabs(steering_angle[i-1]));
+                     double steering_radius = DIST_FRONT_TO_REAR / sin(fabs(steering_angle[index-1]));
                      double car_orientation = tar_rotate_velocity * 0.1;
                      // right direction
                      double car_coor_x = steering_radius * (1 - cos(car_orientation));
                      // left direction
-                     if (steering_angle[i] > 0){
+                     if (steering_angle[index] > 0){
                          car_coor_x = -car_coor_x;
                      }
                      double car_coor_y = steering_radius * sin(car_orientation);
@@ -468,12 +467,12 @@ bool pathfinder::drive() {
                      cone_y = cone_y - displacement;
                  }
 
-                std::cout << "Cone_coor=" << "(" << cone_x << "," << cone_y << ")\n";   // print the coordinates of cones
+//                std::cout << "Cone_coor=" << "(" << cone_x << "," << cone_y << ")\n";   // print the coordinates of cones
             }
             // check if the cone is outside of the processing range
 
             double dist_to_car = cones_iter->get_dist_to_point(point_2d(0.0, 0.0));
-            ROS_INFO_STREAM("dist to car: " << dist_to_car);
+//            ROS_INFO_STREAM("dist to car: " << dist_to_car);
             if (dist_to_car < processing_range) {
                 valid_cones.push_back(*cones_iter);
                 // if the cone is inside the processing range
@@ -482,7 +481,7 @@ bool pathfinder::drive() {
                 if (!update_steering_ranges(*cones_iter)) {
                     // no available path
                     // when at the current step, stop and return false
-                    if (i == 0) {
+                    if (index == 0) {
                         stop();
                         return false;
                         // at projection step
@@ -495,6 +494,7 @@ bool pathfinder::drive() {
             }
 
         }
+
 
         // select the largest steering range (prefer as small change as possible to current steering)
         // collect the data of the second largest steering angle
@@ -517,7 +517,7 @@ bool pathfinder::drive() {
                 // update with larger range
                 second_size = max_size;
                 // derive second largest steering before desired_range_iter changes
-                steering_angle_spare[i] = desired_range_iter->get_mean();
+                steering_angle_spare[index] = desired_range_iter->get_mean();
                 max_size = this_size;
                 desired_range_iter = range_iter;
             } else if (this_size == max_size) {
@@ -531,7 +531,7 @@ bool pathfinder::drive() {
                     // derive second largest steering before desired_range_iter changes
                     if (a != 0){
                         second_size = this_size;
-                        steering_angle_spare[i] = desired_range_iter->get_mean();
+                        steering_angle_spare[index] = desired_range_iter->get_mean();
                     }
                     desired_range_iter = range_iter;
                 }
@@ -539,17 +539,18 @@ bool pathfinder::drive() {
                 } else {
                     if (this_size > second_size) {
                         second_size = this_size;
-                        steering_angle_spare[i] = range_iter->get_mean();
+                        steering_angle_spare[index] = range_iter->get_mean();
                     }
             }
             a++;
         }
 
+
         // check if the steering angle exceed the steering limit?
-        steering_angle[i] = desired_range_iter->get_mean();
-        if (steering_angle[i] < -max_steering) {
+        steering_angle[index] = desired_range_iter->get_mean();
+        if (steering_angle[index] < -max_steering) {
             if (desired_range_iter->get_max() < -max_steering ) {
-                if (i == 0) {
+                if (index == 0) {
                     stop();
                     return false;
                 } else {
@@ -558,32 +559,37 @@ bool pathfinder::drive() {
 
             }
 
-            steering_angle[i] = -max_steering;
+            steering_angle[index] = -max_steering;
         }
-        if (steering_angle[i] > max_steering) {
+
+        if (steering_angle[index] > max_steering) {
             if (desired_range_iter->get_min() > max_steering) {
-                if (i == 0) {
+                if (index == 0) {
                     stop();
                     return false;
                 } else {
                     stop_ = true;
                 }
             }
-            steering_angle[i] = max_steering;
+            steering_angle[index] = max_steering;
         }
 
         // when stop_ is true, get back to the second step before
         if (stop_) {
-            i = i - 3;
-            if (steering_angle_spare[i] != 9999.9) {
-                steering_angle[i] = steering_angle_spare[i];
-            } else {
-                //if their is no available spare angle, do nothing
-                i = i + 3;
+            if (index != 0){
+                index --;
+                if (steering_angle_spare[index] != 9999.9) {
+                    steering_angle[index] = steering_angle_spare[index];
+                } else {
+                    //if their is no available spare angle, do nothing
+                    stop();
+                    return false;
+                }
             }
-
-            //stop();
-            //return false;
+            else {
+                stop();
+                return false;
+            }
         }
     }
         // drive using mean steering for that range
