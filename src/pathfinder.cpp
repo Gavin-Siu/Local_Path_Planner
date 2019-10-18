@@ -424,6 +424,7 @@ bool pathfinder::drive() {
     valid_ranges.push_back(initial_range);
     valid_cones.clear();
     bool stop_ = false;
+    bool stop_real = false;
     double steering_angle[10];
     double steering_angle_spare[10] = {9999.9, 9999.9, 9999.9, 9999.9, 9999.9, 9999.9, 9999.9, 9999.9, 9999.9, 9999.9};
     double car_x[10] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
@@ -432,7 +433,8 @@ bool pathfinder::drive() {
     /* while / for */
     for (int index = 0; index < 10; index++) {
         /* estimate next position of car in xxx s */
-
+        valid_cones.clear();
+        std::cout << "Step:" << index << std::endl;
         // cones.begin()->set_x()
 
         // iterate through the cones and identify the collision free steering ranges
@@ -461,11 +463,11 @@ bool pathfinder::drive() {
                              local_car_x = steering_radius * (1 - cos(fabs(angle_change)));
                          } else {
                              // left
-                             local_car_x = -steering_radius * (1 - cos(fabs(car_angular_velocity) * 0.1));
+                             local_car_x = -steering_radius * (1 - cos(fabs(angle_change)));
                          }
                  } else { // straight ahead
                      car_orientation[index] = car_orientation[index-1];
-                     local_car_y = 0.1 * tar_linear_velocity;
+                     local_car_y = 0.1 * desired_speed;
                  }
                  // Global car coordinate
                  car_x[index] = car_x[index-1] + local_car_x * cos(car_orientation[index])
@@ -484,7 +486,7 @@ bool pathfinder::drive() {
             // check if the cone is outside of the processing range
 
             double dist_to_car = cones_iter->get_dist_to_point(point_2d(0.0, 0.0));
-            ROS_INFO_STREAM("dist to car: " << dist_to_car);
+            // ROS_INFO_STREAM("dist to car: " << dist_to_car);
             if (dist_to_car < processing_range) {
                 valid_cones.push_back(*cones_iter);
                 // if the cone is inside the processing range
@@ -494,8 +496,9 @@ bool pathfinder::drive() {
                     // no available path
                     // when at the current step, stop and return false
                     if (index == 0) {
-                        stop();
-                        return false;
+                        std::cout << "no valid path\n";
+                        stop_real = true;
+                        // return false;
                         // at projection step
                     } else {
                         stop_ = true;
@@ -503,6 +506,15 @@ bool pathfinder::drive() {
                     }
                 }
             }
+        }
+        std::cout << "valid cones:" << valid_cones.size() << std::endl;
+        if (valid_cones.size() == 0) {
+            stop_ = true;
+        }
+
+        if (stop_real) {
+            stop();
+            return false;
         }
         // select the largest steering range (prefer as small change as possible to current steering)
         // collect the data of the second largest steering angle
@@ -552,6 +564,7 @@ bool pathfinder::drive() {
             }
             a++;
         }
+        std::cout << "spare angle =" << steering_angle_spare[index] << std::endl;
         // check if the steering angle exceed the steering limit?
         steering_angle[index] = desired_range_iter->get_mean();
         if (steering_angle[index] < -max_steering) {
@@ -584,16 +597,21 @@ bool pathfinder::drive() {
         if (stop_) {
             if (index != 0){
                     for (index --; index > -2; index --) {
-                        if ( index == -1){
-                            stop();
-                            return false;
+                        if (index == -1){
+                            std::cout << "no choice\n";
+                            break;
                         }
                         else if (steering_angle[index] != steering_angle_spare[index]
-                        && steering_angle_spare[index] != 9999.9){
+                        && steering_angle_spare[index] != 9999.9) {
                             steering_angle[index] = steering_angle_spare[index];
                             stop_ = false;
-                            continue;
+                            std::cout << "step:" << index << "(roll-back)" << std::endl;
+                            break;
                         }
+                        std::cout << "step:" << index << "(roll-back)" << std::endl;
+                    }
+                    if (index == -1){
+                        break;
                     }
             }
             else {
@@ -602,13 +620,9 @@ bool pathfinder::drive() {
             }
         }
     }
-        // drive using mean steering for that range
-        curve(steering_angle[0]);
-
-        /* estimate next position of car in xxx s */
-        /* update cones locations related to car's postion */
-
-
+    // drive using mean steering for that range
+    curve(steering_angle[0]);
+    std::cout << "steering_angle =" << steering_angle[0] << std::endl;
     return true;
 }
 
@@ -623,6 +637,7 @@ void pathfinder::stop() {
     cmdvel.angular.z = tar_steering_angle;
     tar_linear_velocity = cmdvel.linear.x;
     cmdvel_pub.publish(cmdvel);
+    std::cout << "stop\n";
 }
 
 /**
@@ -640,6 +655,7 @@ void pathfinder::curve(double angle) {
         cmdvel.angular.z = angle;
     }
     cmdvel_pub.publish(cmdvel);
+    ROS_INFO_STREAM(" cmdvel:"<<cmdvel);
 
     tar_linear_velocity = cmdvel.linear.x;
     tar_steering_angle = cmdvel.angular.z;

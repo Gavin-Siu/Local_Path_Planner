@@ -15,9 +15,9 @@
 
   max_steering: 24.0                  # in degree (positive)
 
-  processing_range: 3.0               # in meter (drop all data outside this range)
+  processing_range: 3.0              # in meter (drop all data outside this range)
 
-  clearance_radius: 1.8               # in meter (collision free boundary)
+  clearance_radius: 1.2              # in meter (collision free boundary)
 
   ideal_range_size: 0.3
 
